@@ -1,0 +1,10 @@
+batch_size: 128
+dropout: 0.3
+learning_rate: 2e-5
+hidden_layers: 2
+epochs: 1
+max_batch_size_sentiment: 32
+max_batch_size_sarcasm: 32
+max_batch_size_negation: 16
+max_batch_size_similarity: 16
+grad_clip: 1.0
