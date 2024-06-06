@@ -8,4 +8,6 @@ The performances will be printed. The logs and results can be visualized in the 
 
 It can be run with ``` --transformer bert ``` or ``` --transformer roberta ``` to use the particular model as base model.
 
+Different parameters can be tuned in ``` hyperparameters.yaml``` to check performance.
+
 For more details on option, refer the ``` main.py``` file.
