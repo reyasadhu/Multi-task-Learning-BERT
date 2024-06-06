@@ -8,36 +8,28 @@ def plot(args):
     results_dir = os.path.join(current_dir, '..', 'results')
         
     if args.task =='individual':
-        for task in ['sentiment', 'neg', 'sar', 'sim']:
+        for task in ['sentiment', 'neg', 'sar']:
             filepath= os.path.join(args.logs_path, str(task + "_" + args.transformer + '.txt'))
-            if not os.path.exists(filepath):
-                raise FileNotFoundError(f"The log file at  {filepath} does not exist.")
-                return
-            df= pd.read_csv(filepath)
-            plt.figure(figsize=(10, 5))
+            try:
+                df=pd.read_csv(filepath)
+            except FileNotFoundError:
+                print(f"File {filepath} not found!")
+                continue
 
-            plt.subplot(1, 2, 1)
+            plt.figure(figsize=(5, 10))
+
+            plt.subplot(2, 1, 1)
             plt.plot(df['Epoch'], df['Training Loss'], marker='o')
             plt.xlabel('Epoch')
             plt.ylabel('Loss')
             plt.title(f'Training Loss')
-            plt.legend()
-
-            if task=='sim':
-                plt.subplot(1, 2, 2)
-                plt.plot(df['Epoch'], df['Test R2'], marker='o')
-                plt.xlabel('Epoch')
-                plt.ylabel('R2 score')
-                plt.title('Test R2 score')
-                plt.legend()
-
-            else:
-                plt.subplot(1, 2, 1)
-                plt.plot(df['Epoch'], df['Test Acc'], marker='o')
-                plt.xlabel('Epoch')
-                plt.ylabel('Accuracy')
-                plt.title('Test Accuracy')
-                plt.legend()
+    
+            plt.subplot(2, 1, 2)
+            plt.plot(df['Epoch'], df['Test Acc'], marker='o')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.title('Test Accuracy')
+                
 
             plt.suptitle(f'Individual Training Results - {task}')
 
@@ -46,66 +38,68 @@ def plot(args):
             
     else:
         filepath= os.path.join(args.logs_path, str("multitask" + "_" + args.transformer + '.txt'))
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"The log file at  {filepath} does not exist.")
+        try:
+            df=pd.read_csv(filepath)
+        except FileNotFoundError:
+            print(f"File {filepath} not found!")
             return
-        df= pd.read_csv(filepath)
-        plt.figure(figsize=(30, 10))
+       
+        plt.figure(figsize=(15, 20))
 
-        plt.subplot(4, 2, 1)
+        plt.subplot(3, 2, 1)
         plt.plot(df['Epoch'], df['Training Loss Sentiment'], marker='o')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title(f'Training Loss - Sentiment')
         
         
-        plt.subplot(4, 2, 2)
+        plt.subplot(3, 2, 2)
         plt.plot(df['Epoch'], df['Test Accuracy Sentiment'], marker='o')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.title(f'Test Accuracy - Sentiment')
         
             
-        plt.subplot(4, 2, 3)
+        plt.subplot(3, 2, 3)
         plt.plot(df['Epoch'], df['Training Loss Sarcasm'], marker='o')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title(f'Training Loss - Sarcasm')
         
         
-        plt.subplot(4, 2, 4)
+        plt.subplot(3, 2, 4)
         plt.plot(df['Epoch'], df['Test Accuracy Sarcasm'], marker='o')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.title(f'Test Accuracy - Sarcasm')
         
     
-        plt.subplot(4, 2, 5)
+        plt.subplot(3, 2, 5)
         plt.plot(df['Epoch'], df['Training Loss Negation'], marker='o')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title(f'Training Loss - Negation')
         
         
-        plt.subplot(4, 2, 6)
+        plt.subplot(3, 2, 6)
         plt.plot(df['Epoch'], df['Test Accuracy Negation'], marker='o')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.title(f'Test Accuracy - Negation')
         
         
-        plt.subplot(4, 2, 7)
-        plt.plot(df['Epoch'], df['Training Loss Similarity'], marker='o')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title(f'Training Loss - Similarity')
+        # plt.subplot(4, 2, 7)
+        # plt.plot(df['Epoch'], df['Training Loss Similarity'], marker='o')
+        # plt.xlabel('Epoch')
+        # plt.ylabel('Loss')
+        # plt.title(f'Training Loss - Similarity')
         
         
-        plt.subplot(4, 2, 8)
-        plt.plot(df['Epoch'], df['Test R2 Similarity'], marker='o')
-        plt.xlabel('Epoch')
-        plt.ylabel('R2 score')
-        plt.title('Test R2 score - Similarity')
+        # plt.subplot(4, 2, 8)
+        # plt.plot(df['Epoch'], df['Test R2 Similarity'], marker='o')
+        # plt.xlabel('Epoch')
+        # plt.ylabel('R2 score')
+        # plt.title('Test R2 score - Similarity')
                     
         plt.suptitle('Multitask Training Results')
         plt.show()

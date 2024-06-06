@@ -12,9 +12,8 @@ class MultiTaskSentimentAnalysis(nn.Module):
     - Sentiment classification (predict_sentiment)
     - Sarcasm detection (predict_sarcasm)
     - Negation Detection (predict_negation)
-    - Semantic Textual Similarity (predict_similarity)
     '''
-    def __init__(self, args, config):
+    def __init__(self, args, config, pretraining=False):
         super(MultiTaskSentimentAnalysis, self).__init__()
 
         if args.transformer == 'roberta':
@@ -25,21 +24,16 @@ class MultiTaskSentimentAnalysis(nn.Module):
             self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
             
         BERT_HIDDEN_SIZE =  self.bert.config.hidden_size
-#         for param in self.bert.parameters():
-#                 param.requires_grad = True
+        for param in self.bert.parameters():
+            if pretraining:
+                param.requires_grad = False # Freeze bert layers during individual pretraining
+            else:
+                param.requires_grad = True 
         
 #         # Layers for sentiment classification
         self.dropout_sentiment = nn.ModuleList([nn.Dropout(config.hidden_dropout_prob) for _ in range(config.n_hidden_layers + 1)])
-        self.linear_sentiment = nn.ModuleList(
-    [nn.Linear(self.bert.config.hidden_size, self.bert.config.hidden_size) for _ in range(config.n_hidden_layers)] + 
-    [nn.Linear(self.bert.config.hidden_size, config.n_sentiment_classes)])
-#         self.drop = nn.Dropout(p=0.3)
-#         self.classifier = nn.Sequential(
-#             nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
-#             nn.ReLU(),
-#             nn.Dropout(p=0.3),
-#             nn.Linear(BERT_HIDDEN_SIZE, config.n_sentiment_classes)
-#         )
+        self.linear_sentiment = nn.ModuleList([nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE) for _ in range(config.n_hidden_layers)] + [nn.Linear(BERT_HIDDEN_SIZE, 3)])
+
         # Layers for sarcasm detection
         self.dropout_sarcasm = nn.ModuleList([nn.Dropout(config.hidden_dropout_prob) for _ in range(config.n_hidden_layers + 1)])
         self.linear_sarcasm = nn.ModuleList([nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE) for _ in range(config.n_hidden_layers)] + [nn.Linear(BERT_HIDDEN_SIZE, 1)])
@@ -47,10 +41,6 @@ class MultiTaskSentimentAnalysis(nn.Module):
         # Layers for negation detection
         self.dropout_negation = nn.ModuleList([nn.Dropout(config.hidden_dropout_prob) for _ in range(config.n_hidden_layers + 1)])
         self.linear_negation = nn.ModuleList([nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE) for _ in range(config.n_hidden_layers)] + [nn.Linear(BERT_HIDDEN_SIZE, 1)])
-
-        # Layers for sentence similarity
-        self.dropout_similarity = nn.ModuleList([nn.Dropout(config.hidden_dropout_prob) for _ in range(config.n_hidden_layers + 1)])
-        self.linear_similarity = nn.ModuleList([nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE) for _ in range(config.n_hidden_layers)] + [nn.Linear(BERT_HIDDEN_SIZE, 1)])
         
 
     def forward(self, input_ids, attention_mask, task_id):
@@ -113,7 +103,6 @@ class MultiTaskSentimentAnalysis(nn.Module):
         # Step 1: Concatenate the two sentences in: sent1 [SEP] sent2 [SEP]
         input_id = torch.cat((input_ids_1, batch_sep_token_id, input_ids_2, batch_sep_token_id), dim=1)
         attention_mask = torch.cat((attention_mask_1, torch.ones_like(batch_sep_token_id), attention_mask_2, torch.ones_like(batch_sep_token_id)), dim=1)
-
         x = self.forward(input_id, attention_mask, task_id=task_id)
 
         return x
@@ -135,24 +124,3 @@ class MultiTaskSentimentAnalysis(nn.Module):
         x = self.get_paired_embeddings(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, task_id=2)
         return self.last_layers_negation(x)
    
-
-
-    def last_layers_similarity(self, x):
-        """Given a batch of pairs of sentences embeddings, outputs logits for predicting how similar they are."""
-        for i in range(len(self.linear_similarity) - 1):
-            x = self.dropout_similarity[i](x)
-            x = self.linear_similarity[i](x)
-            x = F.relu(x)
-
-      
-        x = self.dropout_similarity[-1](x)
-        preds = self.linear_similarity[-1](x)
-        preds = torch.sigmoid(preds)  # Sigmoid to constrain to (0, 1)
-        preds = preds * 5 
-        return preds
-    
-    def predict_similarity(self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2):
-        '''Given a batch of pairs of sentences, outputs a single logit corresponding to how similar they are.'''
-        # Get the embeddings
-        x = self.get_paired_embeddings(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, task_id=3)
-        return self.last_layers_similarity(x)

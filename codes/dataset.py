@@ -10,17 +10,17 @@ warnings.filterwarnings("ignore")
 
 def load_sentiment_data(sentiment_filename):
     sentiment_data = []
-    rows=[]
     with open(sentiment_filename, 'r') as f:
         for row in csv.DictReader(f,delimiter = '\t'):
             sent = row['sentence'].lower().strip()
             sentiment = int(row['sentiment'].strip())
-            if sentiment==1:
-                sentiment=0 # both negative and very negative is mapped to negative
-            elif sentiment==2:
-                sentiment=1
-            elif sentiment ==3 or sentiment==4:
-                sentiment=2
+            if sentiment in [0,2,4]: #only keeping the negative, neutral and positive
+                if sentiment==2:
+                    sentiment=1
+                elif sentiment==4:
+                    sentiment=2 
+            else:
+                continue
             
             sentiment_data.append((sent, sentiment))
     return sentiment_data 
@@ -40,20 +40,10 @@ def load_negation_data(negation_filename):
 def load_sarcasm_data(sarcasm_filename):
     def parseJson(fname):
         for line in open(fname, 'r'):
-            yield eval(line)
-    sarcasm_data= list(parseJson(sarcasm_filename))
+            data = eval(line)
+            yield (data['headline'], data['is_sarcastic'])
+    sarcasm_data = list(parseJson(sarcasm_filename))
     return sarcasm_data 
-
-
-def load_similarity_data(similarity_filename):
-    similarity_data=[]
-    with open(similarity_filename, 'r') as f:
-            for row in csv.DictReader(f,delimiter = '\t'):
-                sentence1 = row['sentence1'].lower().strip()
-                sentence2 =  row['sentence2'].lower().strip()
-                
-                similarity_data.append((sentence1, sentence2, float(row['similarity'])))
-    return similarity_data 
                                  
 
 def load_multitask_data(split='train'):
@@ -63,16 +53,16 @@ def load_multitask_data(split='train'):
         sentiment_data = load_sentiment_data('./Dataset/Sentiment SST5/train.csv')
         negation_data = load_negation_data('./Dataset/Cannot_data/train.csv')
         sarcasm_data = load_sarcasm_data('./Dataset/Sarcasm-News-Headline/train.json')
-        similarity_data = load_similarity_data('./Dataset/STS SemEval/sts-train.csv')
+       
         
     elif split=='test':
         
         sentiment_data = load_sentiment_data('./Dataset/Sentiment SST5/test.csv')
         negation_data = load_negation_data('./Dataset/Cannot_data/test.csv')
         sarcasm_data = load_sarcasm_data('./Dataset/Sarcasm-News-Headline/test.json')
-        similarity_data = load_similarity_data('./Dataset/STS SemEval/sts-test.csv')
+       
         
-    return sentiment_data, negation_data, sarcasm_data, similarity_data
+    return sentiment_data, negation_data, sarcasm_data
 
 class PairSentenceDataset(Dataset):
 
@@ -96,9 +86,9 @@ class PairSentenceDataset(Dataset):
         sent2 = [x[1] for x in data]
         labels = [x[2] for x in data]
         
-        
-        encoding1 = self.tokenizer(sent1, return_tensors='pt', padding=True, truncation=True)
-        encoding2 = self.tokenizer(sent2, return_tensors='pt', padding=True, truncation=True)
+        max_length = int(self.tokenizer.model_max_length//2)-2
+        encoding1 = self.tokenizer(sent1, return_tensors='pt', padding='max_length', max_length=max_length, truncation=True)
+        encoding2 = self.tokenizer(sent2, return_tensors='pt', padding='max_length', max_length=max_length, truncation=True)
 
         token_ids = torch.tensor(encoding1['input_ids'], dtype=torch.long)
         attention_mask = torch.tensor(encoding1['attention_mask'], dtype=torch.long)
@@ -167,12 +157,12 @@ class SingleSentenceDataset(Dataset):
         return batched_data 
 
 def load_dataloaders(args, config):
-    sentiment_train_data, neg_train_data, sar_train_data, sim_train_data = load_multitask_data()
-    sentiment_test_data, neg_test_data, sar_test_data, sim_test_data = load_multitask_data(split ='test')
+    sentiment_train_data, neg_train_data, sar_train_data= load_multitask_data()
+    sentiment_test_data, neg_test_data, sar_test_data= load_multitask_data(split ='test')
     
     config.batch_size_individual={}
     
-    for task in ['sentiment', 'neg', 'sar', 'sim']:
+    for task in ['sentiment', 'neg', 'sar']:
         config.gradient_accumulations[task] = int(np.ceil(config.batch_size / config.max_batch_size[task]))
         config.batch_size_individual[task] = config.batch_size // config.gradient_accumulations[task]
         
@@ -199,16 +189,9 @@ def load_dataloaders(args, config):
     neg_test_dataloader = DataLoader(neg_test_data, shuffle=False, batch_size=config.batch_size_individual['neg'],
                                     collate_fn=neg_test_data.collate_fn)
     
-    # sim: Semantic textual similarity
-    sim_train_data = PairSentenceDataset(sim_train_data, args, isRegression=True)
-    sim_test_data = PairSentenceDataset(sim_test_data, args, isRegression=True)
-    sim_train_dataloader = DataLoader(sim_train_data, shuffle=True, batch_size=config.batch_size_individual['sim'],
-                                        collate_fn=sim_train_data.collate_fn)
-    sim_test_dataloader = DataLoader(sim_test_data, shuffle=False, batch_size=config.batch_size_individual['sim'],
-                                    collate_fn=sim_test_data.collate_fn)
     
-    train_dataloaders = {'sentiment': sentiment_train_dataloader, 'sar': sar_train_dataloader, 'neg': neg_train_dataloader, 'sim': sim_train_dataloader}
+    train_dataloaders = {'sentiment': sentiment_train_dataloader, 'sar': sar_train_dataloader, 'neg': neg_train_dataloader}
     
-    test_dataloaders = {'sentiment': sentiment_test_dataloader, 'sar': sar_test_dataloader, 'neg': neg_test_dataloader, 'sim': sim_test_dataloader}
+    test_dataloaders = {'sentiment': sentiment_test_dataloader, 'sar': sar_test_dataloader, 'neg': neg_test_dataloader}
     
     return train_dataloaders, test_dataloaders
