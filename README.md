@@ -6,7 +6,7 @@ First one will train three models on three tasks independently. Second one will 
 
 The performances will be printed. The logs and results can be visualized in the respective folders.
 
-It can be run with ``` --transformer bert ``` or ``` --transformer roberta ``` to use the particular model as base model.
+It can be run with ``` --transformer bert ``` or ``` --transformer roberta ``` to use the particular model as base model. By default it will use the BERT base model.
 
 Different parameters can be tuned in ``` hyperparameters.yaml``` to check performance.
 
